@@ -209,7 +209,6 @@ public class TrucoreMSServiceImpl implements TrucoreMSService {
 						if (label.equals("FileName")) {
 							downloadFileJsonObj.fileName = metaData.get("FileName");
 						}
-
 						if (label.equals("FileSize")) {
 							downloadFileJsonObj.fileSize = metaData.get("FileSize");
 						}
@@ -218,6 +217,9 @@ public class TrucoreMSServiceImpl implements TrucoreMSService {
 				downloadFileJsonObj.sender = mTPAPackage.getHeader().getCreator().asString();
 				PackageDetails pkgDetail = PackageDetails.getPackageDetails(pgkhd);
 				downloadFileJsonObj.status = pkgDetail.PackageStatus;
+				if ("EXPIRED".equals(pkgDetail.PackageStatus)) {
+					continue;
+				}
 				RespGetDownloadFilesJsonObj.downloadFiles.add(downloadFileJsonObj);
 			}
 		} catch (Exception e) {

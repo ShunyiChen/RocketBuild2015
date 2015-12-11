@@ -38,6 +38,7 @@ public class FileUploadAction extends BaseAction {
 	public void doPost(HttpServletRequest request, HttpServletResponse response)
 			throws ServletException, IOException {
 		ResponseJsonObj respJsonObj = new ResFileUploadJsonObj();
+		OutputStream out = null;
 		String filePath = getServletConfig().getServletContext().getRealPath("/"); 
 		String jsonStr = readJSONString(request);
 		try {
@@ -46,22 +47,22 @@ public class FileUploadAction extends BaseAction {
 			}
 			ReqFileUploadJsonObj rj = JsonHelper.parseObject(jsonStr, ReqFileUploadJsonObj.class);
 	        byte[] decodedBytes = Base64.decodeBase64(rj.image.getBytes());
-			File p = new File(filePath+"/"+Constant.TC_UPLOAD_FOLDER);
+			File p = new File(filePath+"//"+Constant.TC_UPLOAD_FOLDER);
 			if (!p.exists()) {
 				p.mkdir();
 			}
-			File uploadFile = new File(p, rj.filename);
-			OutputStream out = new FileOutputStream(uploadFile);
+			File uploadFile = new File(p.getAbsolutePath()+"//"+rj.filename);
+			if (!uploadFile.exists()) {
+				uploadFile.createNewFile();
+			}
+			out = new FileOutputStream(uploadFile);
 		    out.write(decodedBytes);  
-	        out.close();
 			// Add uploadfile to the list.
 			List<File> lstFile = new ArrayList<File>();
 			lstFile.add(uploadFile);
 			
 			// Start uploading
 			respJsonObj = trucoreMSService.fileUpload(rj.token, lstFile, filePath + Constant.TC_UPLOAD_FOLDER, rj.pfirstname, rj.plastname, rj.pemail);
-			// Delete the temporary file.
-			uploadFile.delete();
 		} catch (JSONException e2) {
 			response.setStatus(400);
 			respJsonObj.result = TrucoreMSService.FAILED;
@@ -78,6 +79,9 @@ public class FileUploadAction extends BaseAction {
 			respJsonObj.log = e.getMessage();
 			e.printStackTrace();
 		} finally {
+			if (out != null) {
+				out.close();
+			}
 			// Return the messages to the client.
 			responseToClient(response, respJsonObj);
 		}

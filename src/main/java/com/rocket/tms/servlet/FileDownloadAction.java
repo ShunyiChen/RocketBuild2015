@@ -13,7 +13,6 @@ import javax.servlet.http.HttpServletResponse;
 import net.trubiquity.tpa.router.ServiceException;
 
 import com.rocket.tms.json.ReqGetDownloadFilsJsonObj;
-import com.rocket.tms.util.Constant;
 import com.rocket.tms.util.JsonHelper;
 
 public class FileDownloadAction extends BaseAction {
@@ -28,38 +27,41 @@ public class FileDownloadAction extends BaseAction {
 	 */
 	public void doPost(HttpServletRequest request, HttpServletResponse response)
 			throws ServletException, IOException {
+		String filePath = getServletConfig().getServletContext().getRealPath("/"); 
 		String jsonStr = readJSONString(request);
-		// Start uploading files
+		FileInputStream fis = null;
+		ServletOutputStream out = null;
 		try {
 			if (jsonStr == null || "".equals(jsonStr)) {
 				throw new Exception("JSON data is an empty string or NULL.");
 			}
 			ReqGetDownloadFilsJsonObj rj = JsonHelper.parseObject(jsonStr,
 					ReqGetDownloadFilsJsonObj.class);
-			File f = trucoreMSService.fileDownload(rj.token, rj.filename, Constant.DOWNLOAD_FOLDER);
-
-			if(f != null && f.exists()){  
-				FileInputStream fis = new FileInputStream(f);  
+			File f = trucoreMSService.fileDownload(rj.token, rj.filename, filePath);
+			if(f != null && f.exists()){
+				fis = new FileInputStream(f);
 				String filename= URLEncoder.encode(f.getName(),"utf-8");
-				byte[] b = new byte[fis.available()];  
+				byte[] b = new byte[fis.available()];
 				fis.read(b);
 				response.setContentType("application/octet-stream");
 				response.setCharacterEncoding("utf-8");
 				response.setHeader("Content-Disposition","attachment; filename="+filename+"");
 				response.setHeader("filelength", f.length()+"");
-				
-				ServletOutputStream out = response.getOutputStream();  
-				out.write(b); 
+				out = response.getOutputStream();
+				out.write(b);
 				out.flush(); 
-				out.close();
-				fis.close();
-			}     
-
+			}
 		} catch (ServiceException e1) {
 			e1.printStackTrace();
 		} catch (Exception e) {
 			e.printStackTrace();
+		} finally {
+			if (out != null) {
+				out.close();
+			}
+			if (fis != null) {
+				fis.close();
+			}
 		}
 	}
-
 }

@@ -102,6 +102,9 @@ public class TrucoreMSServiceImpl implements TrucoreMSService {
 			case UploadCompleted:
 				break;
 			case Uploading:
+				String msg = "You receive a new file notification.";
+				System.out.println(msg);
+				pushNotificationsToiOSdevices(msg);
 				break;
 			default:
 				break;
@@ -132,7 +135,7 @@ public class TrucoreMSServiceImpl implements TrucoreMSService {
 				SimpleIdentityToken token = (SimpleIdentityToken) mIdentityStub.login(credentials);
 				respLoginJsonObj.result = SUCCESS;
 				respLoginJsonObj.token = token.getAuthenticationToken();
-				tokenMap.clear();
+//				tokenMap.clear();
 				tokenMap.put(token.getAuthenticationToken(), token);
 			}
 
@@ -217,10 +220,10 @@ public class TrucoreMSServiceImpl implements TrucoreMSService {
 				downloadFileJsonObj.sender = mTPAPackage.getHeader().getCreator().asString();
 				PackageDetails pkgDetail = PackageDetails.getPackageDetails(pgkhd);
 				downloadFileJsonObj.status = pkgDetail.PackageStatus;
-				if ("EXPIRED".equals(pkgDetail.PackageStatus)) {
-					continue;
+				System.out.println("   ["+pkgDetail.PackageStatus+"] "+downloadFileJsonObj.fileName+" "+downloadFileJsonObj.fileSize);
+				if ("DELIVERED".equals(pkgDetail.PackageStatus)) {
+					RespGetDownloadFilesJsonObj.downloadFiles.add(downloadFileJsonObj);
 				}
-				RespGetDownloadFilesJsonObj.downloadFiles.add(downloadFileJsonObj);
 			}
 		} catch (Exception e) {
 			RespGetDownloadFilesJsonObj.result = TrucoreMSService.FAILED;
@@ -239,9 +242,9 @@ public class TrucoreMSServiceImpl implements TrucoreMSService {
 		res.result = TrucoreMSService.SUCCESS;
 		res.token = token.getAuthenticationToken();
 		res.log = "You have successfully uploaded "+uploadFiles.size()+" file(s).";
-		UserProfile loginUser = (UserProfile) mProfileAdministrationStub.getMyProfile(token);
-		String msg = loginUser.firstName + " " + loginUser.lastName+" has uploaded a file "+uploadFiles.get(0).getName()+".";
-		pushNotificationsToiOSdevices(msg);
+//		UserProfile loginUser = (UserProfile) mProfileAdministrationStub.getMyProfile(token);
+//		String msg = loginUser.firstName + " " + loginUser.lastName+" has uploaded a file "+uploadFiles.get(0).getName()+".";
+//		pushNotificationsToiOSdevices(msg);
 		return res;
 	}
 	
@@ -265,65 +268,75 @@ public class TrucoreMSServiceImpl implements TrucoreMSService {
 	
 	@Override
 	public File fileDownload(String tokenStr, String filename,
-			String downloadFolder) throws Exception {
+			String downloadFolder) {
 		SimpleIdentityToken token = tokenMap.get(tokenStr);
 		// Get the avaliable packages from TRUCore server
 		PackageFilter fltr = new PackageFilter();
 		// fltr.add(PackageFilterKeys.ALL_COMPANY_PACKAGES, "ALL");
 		// fltr.add(PackageFilterKeys.STATUS, "Intransit");
-		IPackageList dt = mTRUShareSimpleClient.getPackages(token, fltr, PackageFilterType.RECEIVED, (long) 1);
-		PackageList pl = (PackageList) dt;
-		if (pl.list.size() <= 0) {
-			return null;
-		}
-		List<String> files = new ArrayList<String>();
-		outer:for (TPAPackage pkg : pl.list) {
-			PackageHandle handle = (PackageHandle) pkg.getHandle();
-			String packageID = handle.toString();
-			if (packageID.contains("/"))
-				packageID = packageID.substring(packageID.lastIndexOf("/") + 1);
-			TPAPackage mTPAPackage = (TPAPackage) mTRUShareSimpleClient.getPackage(token, pkg.getHandle());
-			for (PackagePayload payload : mTPAPackage.payloads) {
-				IMetaDataList metaData = payload.getMetaData();
-				for (String label : metaData.getLabels()) {
-					if (label.equals("FileName")) {
-						String fName = metaData.get("FileName");
-						if (filename.equals(fName)) {
-							files.add(metaData.get(IMFXClient.FILE_PATH));
-							// get my private key for file decryption
-							// get package details and ASYNC call server I have done to download
-							// request
-							PackageDetails packageDetails = PackageDetails.getPackageDetails(mTPAPackage);
-							CommunityHandle communityHandle = new CommunityHandle(mCommunityAdministrationStub.handler.getBaseUrl() + "community/" + packageDetails.CommunityID, packageDetails.CommunityID);
-							// CommunityHandle communityHandle = new CommunityHandle("",
-							// packageDetails.CommunityID);
-							Community community = (Community) mIdentityResolverStub.getCommunity(token, communityHandle);// get
-							// communites
-							// details
-							UserProfile recipient = (UserProfile) mProfileAdministrationStub.getMyProfile(token);
-							KeyData recipientPrivateKeyInfo = new KeyData();
-							recipientPrivateKeyInfo.setKeyType(KeyType.UserPrivateKeyOnServer);
-							recipientPrivateKeyInfo.setUserHandle(recipient);
-							if (community.getEncryptionType() == CommunityEncryptionType.CommunityKeyEncryption) {
-								recipientPrivateKeyInfo.setCommunityHandle(communityHandle);
-								recipientPrivateKeyInfo.setKeyType(KeyType.Community);
+		IPackageList dt;
+		try {
+			dt = mTRUShareSimpleClient.getPackages(token, fltr, PackageFilterType.RECEIVED, (long) 1);
+		
+			PackageList pl = (PackageList) dt;
+			if (pl.list.size() <= 0) {
+				return null;
+			}
+//			List<String> files = new ArrayList<String>();
+			outer:for (TPAPackage pkg : pl.list) {
+				PackageHandle handle = (PackageHandle) pkg.getHandle();
+				String packageID = handle.toString();
+				if (packageID.contains("/"))
+					packageID = packageID.substring(packageID.lastIndexOf("/") + 1);
+				TPAPackage mTPAPackage = (TPAPackage) mTRUShareSimpleClient.getPackage(token, pkg.getHandle());
+				for (PackagePayload payload : mTPAPackage.payloads) {
+					IMetaDataList metaData = payload.getMetaData();
+					for (String label : metaData.getLabels()) {
+						if (label.equals("FileName")) {
+							String fName = metaData.get("FileName");
+							if (filename.equals(fName)) {
+//								files.add(metaData.get(IMFXClient.FILE_PATH));
+//								// get my private key for file decryption
+//								// get package details and ASYNC call server I have done to download
+//								// request
+//								PackageDetails packageDetails = PackageDetails.getPackageDetails(mTPAPackage);
+//								CommunityHandle communityHandle = new CommunityHandle(mCommunityAdministrationStub.handler.getBaseUrl() + "community/" + packageDetails.CommunityID, packageDetails.CommunityID);
+//								// CommunityHandle communityHandle = new CommunityHandle("",
+//								// packageDetails.CommunityID);
+//								Community community = (Community) mIdentityResolverStub.getCommunity(token, communityHandle);// get
+//								// communites
+//								// details
+//								UserProfile recipient = (UserProfile) mProfileAdministrationStub.getMyProfile(token);
+//								KeyData recipientPrivateKeyInfo = new KeyData();
+//								recipientPrivateKeyInfo.setKeyType(KeyType.UserPrivateKeyOnServer);
+//								recipientPrivateKeyInfo.setUserHandle(recipient);
+//								if (community.getEncryptionType() == CommunityEncryptionType.CommunityKeyEncryption) {
+//									recipientPrivateKeyInfo.setCommunityHandle(communityHandle);
+//									recipientPrivateKeyInfo.setKeyType(KeyType.Community);
+//								}
+								
+//								MFXClient.downloadAndDecryptFiles(token, keyStore, recipientPrivateKeyInfo, packageID, files, downloadFolder + Constant.DOWNLOAD_FOLDER, true);
+								List<TPAPackage> pkgList = new ArrayList<TPAPackage>();
+								pkgList.add(pkg);
+								MFXClient.downloadAdnDecryptFiles(token, pkgList, downloadFolder + Constant.DOWNLOAD_FOLDER);
+								//.downloadFile(uToken, packageID, fileName, targetDir, startByte)
+								
+								File returnFile = new File(downloadFolder + Constant.TC_UPLOAD_FOLDER+"/"+filename);
+								System.out.println("########"+downloadFolder +Constant.TC_UPLOAD_FOLDER+"/"+filename+"########");
+								if (returnFile.exists()) {
+									return returnFile;
+								}
+								
+								break outer;
 							}
-							
-							MFXClient.downloadAndDecryptFiles(token, keyStore, recipientPrivateKeyInfo, packageID, files, downloadFolder, true);
-							//.downloadFile(uToken, packageID, fileName, targetDir, startByte)
-							
-							File returnFile = new File(downloadFolder + "/"+filename);
-							if (returnFile.exists()) {
-								return returnFile;
-							}
-							
-							break outer;
 						}
 					}
 				}
 			}
+		} catch (ServiceException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
 		}
-
 		return null;
 	}
 
